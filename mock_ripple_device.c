@@ -128,7 +128,7 @@ receiver(struct simple_udp_connection *c,
          uint16_t datalen)
 {
   struct ripplecomm_header h;
-  printf("Data received on port %d from port %d with length %d\n", receiver_port, sender_port, datalen);
+  //printf("Data received on port %d from port %d with length %d\n", receiver_port, sender_port, datalen);
   memcpy(&h, data, sizeof(struct ripplecomm_header));
 
   if (h.r_dispatch == RIPPLECOMM_DISPATCH && h.r_version >= RIPPLECOMM_VERSION_MIN_COMPAT)
@@ -338,7 +338,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   process_start(&fake_signal_process, 0);
 
   SENSORS_ACTIVATE(button_sensor);
-  ctimer_set(&vtimer, CLOCK_SECOND,current_vitals_update,NULL);
+  ctimer_set(&vtimer, CLOCK_SECOND*3,current_vitals_update,NULL);
 
   while(1)
   {
@@ -352,11 +352,11 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     }
     else if (ev == vital_update_event)
     {
-      ctimer_set(&vtimer, CLOCK_SECOND,current_vitals_update,NULL);
+      ctimer_set(&vtimer, CLOCK_SECOND*3,current_vitals_update,NULL);
     }
     else if (ev == sensors_event && data == &button_sensor)
     {
-      if (report_mode == 3)
+      if (report_mode == 2)
       {
         report_mode = 0;
       }
@@ -366,7 +366,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
       //on mode switch, clear all subscriptions, create new ones, this will even clear requested unicast subscriptions
       clear_subscriptions(&record_sl);
 
-      if (report_mode == 1 )
+      if (report_mode == 4 )
       {
         //vitalprop mode
         struct ripplecomm_s_req sr;
@@ -380,21 +380,21 @@ PROCESS_THREAD(test_subscription_process, ev, data)
         create_subscription(&record_sl,0,sr.r_expiration,vp_update,sink);
       }
 
-      else if (report_mode == 2 )
+      else if (report_mode == 1 )
       {
         //broadcast mode -only with uip
-        vitalprop_close(&vp);
+        //vitalprop_close(&vp);
 #if WITH_UIP6
-        struct ripplecomm_s_req sr;
+        //struct ripplecomm_s_req sr;
         subscription_data_t sink = {{0}};
         uip_create_linklocal_allnodes_mcast(&bcast_addr);
         memcpy(&(sink), &bcast_addr,sizeof(uip_ipaddr_t));
         //printf("creating broadcast ubscription");
-        create_subscription(&record_sl,0,sr.r_expiration,vc_send,sink);
+        create_subscription(&record_sl,0,0,vc_send,sink);
 #endif//WITH_UIP6
         //report_mode++;
       }
-      else if (report_mode ==3 )
+      else if (report_mode ==2 )
       {
         //return to default request only mode
         //vitalprop_close(&vp);
