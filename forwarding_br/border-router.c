@@ -60,8 +60,6 @@
 
 uint16_t dag_id[] = {0x1111, 0x1100, 0, 0, 0, 0, 0, 0x0011};
 
-extern uip_ds6_nbr_t uip_ds6_nbr_cache[];
-
 static uip_ipaddr_t prefix;
 static uint8_t prefix_set;
 
@@ -70,7 +68,6 @@ PROCESS(border_router_process, "Border router process");
 #if WEBSERVER==0
 /* No webserver */
 AUTOSTART_PROCESSES(&border_router_process);
-
 #elif WEBSERVER>1
 /* Use an external webserver application */
 #include "webserver-nogui.h"
@@ -108,7 +105,7 @@ PROCESS_THREAD(webserver_nogui_process, ev, data)
     PROCESS_WAIT_EVENT_UNTIL(ev == tcpip_event);
     httpd_appcall(data);
   }
-
+  
   PROCESS_END();
 }
 AUTOSTART_PROCESSES(&border_router_process,&webserver_nogui_process);
@@ -154,6 +151,7 @@ PT_THREAD(generate_routes(struct httpd_state *s))
 {
   static int i;
   static uip_ds6_route_t *r;
+  static uip_ds6_nbr_t *nbr;
 #if BUF_USES_STACK
   char buf[256];
 #endif
@@ -171,37 +169,39 @@ PT_THREAD(generate_routes(struct httpd_state *s))
   blen = 0;
 #endif
   ADD("Neighbors<pre>");
-  for(i = 0; i < UIP_DS6_NBR_NB; i++) {
-    if(uip_ds6_nbr_cache[i].isused) {
+
+  for(nbr = nbr_table_head(ds6_neighbors);
+      nbr != NULL;
+      nbr = nbr_table_next(ds6_neighbors, nbr)) {
 
 #if WEBSERVER_CONF_NEIGHBOR_STATUS
 #if BUF_USES_STACK
 {char* j=bufptr+25;
-      ipaddr_add(&uip_ds6_nbr_cache[i].ipaddr);
+      ipaddr_add(&nbr->ipaddr);
       while (bufptr < j) ADD(" ");
-      switch (uip_ds6_nbr_cache[i].state) {
+      switch (nbr->state) {
       case NBR_INCOMPLETE: ADD(" INCOMPLETE");break;
       case NBR_REACHABLE: ADD(" REACHABLE");break;
-      case NBR_STALE: ADD(" STALE");break;
+      case NBR_STALE: ADD(" STALE");break;      
       case NBR_DELAY: ADD(" DELAY");break;
       case NBR_PROBE: ADD(" NBR_PROBE");break;
       }
 }
 #else
 {uint8_t j=blen+25;
-      ipaddr_add(&uip_ds6_nbr_cache[i].ipaddr);
+      ipaddr_add(&nbr->ipaddr);
       while (blen < j) ADD(" ");
-      switch (uip_ds6_nbr_cache[i].state) {
+      switch (nbr->state) {
       case NBR_INCOMPLETE: ADD(" INCOMPLETE");break;
       case NBR_REACHABLE: ADD(" REACHABLE");break;
-      case NBR_STALE: ADD(" STALE");break;
+      case NBR_STALE: ADD(" STALE");break;      
       case NBR_DELAY: ADD(" DELAY");break;
       case NBR_PROBE: ADD(" NBR_PROBE");break;
       }
 }
 #endif
 #else
-      ipaddr_add(&uip_ds6_nbr_cache[i].ipaddr);
+      ipaddr_add(&nbr->ipaddr);
 #endif
 
       ADD("\n");
@@ -216,7 +216,6 @@ PT_THREAD(generate_routes(struct httpd_state *s))
         blen = 0;
       }
 #endif
-    }
   }
   ADD("</pre>Routes<pre>");
   SEND_STRING(&s->sout, buf);
@@ -226,7 +225,7 @@ PT_THREAD(generate_routes(struct httpd_state *s))
   blen = 0;
 #endif
 
-  for(r = uip_ds6_route_list_head(); r != NULL; r = list_item_next(r)) {
+  for(r = uip_ds6_route_head(); r != NULL; r = uip_ds6_route_next(r)) {
 
 #if BUF_USES_STACK
 #if WEBSERVER_CONF_ROUTE_LINKS
@@ -252,7 +251,7 @@ PT_THREAD(generate_routes(struct httpd_state *s))
 #endif
 #endif
     ADD("/%u (via ", r->length);
-    ipaddr_add(&r->nexthop);
+    ipaddr_add(uip_ds6_route_nexthop(r));
     if(1 || (r->state.lifetime < 600)) {
       ADD(") %lus\n", r->state.lifetime);
     } else {
@@ -377,7 +376,7 @@ PROCESS_THREAD(border_router_process, ev, data)
   PROCESS_BEGIN();
 
 /* While waiting for the prefix to be sent through the SLIP connection, the future
- * border router can join an existing DAG as a parent or child, or acquire a default
+ * border router can join an existing DAG as a parent or child, or acquire a default 
  * router that will later take precedence over the SLIP fallback interface.
  * Prevent that by turning the radio off until we are initialized as a DAG root.
  */
@@ -396,7 +395,7 @@ PROCESS_THREAD(border_router_process, ev, data)
      cpu will interfere with establishing the SLIP connection */
   NETSTACK_MAC.off(1);
 #endif
-
+ 
   /* Request prefix until it has been received */
   while(!prefix_set) {
     etimer_set(&et, CLOCK_SECOND);
@@ -414,7 +413,7 @@ PROCESS_THREAD(border_router_process, ev, data)
    * Since we are the DAG root, reception delays would constrain mesh throughbut.
    */
   NETSTACK_MAC.off(1);
-
+  
 #if DEBUG || 1
   print_local_addresses();
 #endif
