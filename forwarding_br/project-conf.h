@@ -32,7 +32,7 @@
 #define __PROJECT_ROUTER_CONF_H__
 
 //forward a collection port to the tun interface
-#define COLLECTION_UDP_PORT 5688
+#define COLLECTION_UDP_PORT 5689
 #define FORWARDING_UDP_PORT 5690
 
 //define the TUN address

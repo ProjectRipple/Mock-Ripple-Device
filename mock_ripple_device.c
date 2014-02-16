@@ -356,7 +356,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     }
     else if (ev == sensors_event && data == &button_sensor)
     {
-      if (report_mode == 2)
+      if (report_mode == 3)
       {
         report_mode = 0;
       }
@@ -366,7 +366,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
       //on mode switch, clear all subscriptions, create new ones, this will even clear requested unicast subscriptions
       clear_subscriptions(&record_sl);
 
-      if (report_mode == 4 )
+      if (report_mode == 1 )
       {
         //vitalprop mode
         struct ripplecomm_s_req sr;
@@ -380,10 +380,10 @@ PROCESS_THREAD(test_subscription_process, ev, data)
         create_subscription(&record_sl,0,sr.r_expiration,vp_update,sink);
       }
 
-      else if (report_mode == 1 )
+      else if (report_mode == 2 )
       {
         //broadcast mode -only with uip
-        //vitalprop_close(&vp);
+        vitalprop_close(&vp);
 #if WITH_UIP6
         //struct ripplecomm_s_req sr;
         subscription_data_t sink = {{0}};
@@ -394,7 +394,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
 #endif//WITH_UIP6
         //report_mode++;
       }
-      else if (report_mode ==2 )
+      else if (report_mode ==3 )
       {
         //return to default request only mode
         //vitalprop_close(&vp);
