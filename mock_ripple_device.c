@@ -12,8 +12,7 @@
 //#define WITH_UIP6
 
 #include "contiki.h"
-
-#include "vitalprop.h"
+#include "common.h"
 #include "frame_buffer.h"
 #include "frame_subscription.h"
 #include "lib/random.h"
@@ -40,20 +39,14 @@ static struct subscription_list fake_resp_sl;
 static struct subscription_list fake_ecg_sl;
 static struct subscription_list record_sl;
 
-//const static struct vitalprop_callbacks vitalprop_call = {vp_recv};
-static struct vitalprop_conn vp;
+
 
 static struct simple_udp_connection vitalcast_connection;
 
 //Fake Signal Event
 static process_event_t buffer_flop_event;
 static process_event_t vital_update_event;
-/*---------------------------------------------------------------------------*/
-//subscription callback routine -  update vplist with current vitals for vitalprop
-static void vp_update(void *frame_ptr, void *data_ptr, subscription_data_t *subscription_data)
-{
-  vp.vl.e[0].r = current_vitals;
-}
+
 /*---------------------------------------------------------------------------*/
 //subscription callback routine -  UDP unicast data
 static void vc_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscription_data)
@@ -162,18 +155,11 @@ static void set_global_address(void)
     }
   }
 }
-/*---------------------------------------------------------------------------*/
-static void
-vp_recv(struct vitalprop_conn *c)
-{
-//  printf("%d.%d: vp message received\n",
-//	 rimeaddr_node_addr.u8[0], rimeaddr_node_addr.u8[1]);
-}
+
 /*---------------------------------------------------------------------------*/
 PROCESS(test_subscription_process, "Subscription example");
 PROCESS(fake_signal_process, "fake signal");
 AUTOSTART_PROCESSES(&test_subscription_process);
-const static struct vitalprop_callbacks vitalprop_call = {vp_recv};
 /*---------------------------------------------------------------------------*/
 
 
@@ -229,7 +215,6 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   static struct ctimer vtimer;
   static int report_mode = 0;// 0 - broadcast, 1 -vitalprop, 2 - unicast to subscribers
   uip_ipaddr_t bcast_addr;
-  PROCESS_EXITHANDLER(vitalprop_close(&vp);)
   PROCESS_BEGIN();
   resp_frame_buffer_init(&fake_resp_buffer);//this needs to come after process begin
   ecg_frame_buffer_init(&fake_ecg_buffer);
@@ -269,7 +254,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     }
     else if (ev == sensors_event && data == &button_sensor)
     {
-      if (report_mode == 3)
+      if (report_mode == 2)
       {
         report_mode = 0;
       }
@@ -281,27 +266,14 @@ PROCESS_THREAD(test_subscription_process, ev, data)
 
       if (report_mode == 1 )
       {
-        //vitalprop mode
-        struct ripplecomm_s_req sr;
-        subscription_data_t sink = {{0}};
-        vitalprop_open(&vp, CLOCK_SECOND*10, UDP_PORT2, &vitalprop_call);
-        //printf("creating vitalprop ubscription");
-        create_subscription(&record_sl,0,sr.r_expiration,vp_update,sink);
-      }
-
-      else if (report_mode == 2 )
-      {
         //broadcast mode -only with uip
-        vitalprop_close(&vp);
-        //struct ripplecomm_s_req sr;
         subscription_data_t sink = {{0}};
         uip_create_linklocal_allnodes_mcast(&bcast_addr);
         memcpy(&(sink), &bcast_addr,sizeof(uip_ipaddr_t));
         //printf("creating broadcast ubscription");
         create_subscription(&record_sl,0,0,vc_send,sink);
-        //report_mode++;
       }
-      else if (report_mode ==3 )
+      else if (report_mode ==2 )
       {
         //return to default request only mode
         //vitalprop_close(&vp);

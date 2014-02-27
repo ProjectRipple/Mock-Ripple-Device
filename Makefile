@@ -1,6 +1,4 @@
 all: mock_ripple_device
-PROJECT_SOURCEFILES += vitalprop.c
-PROJECT_SOURCEFILES += vp_list.c
 PROJECT_SOURCEFILES += frame_buffer.c
 PROJECT_SOURCEFILES += frame_subscription.c
 
