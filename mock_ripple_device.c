@@ -24,13 +24,10 @@
 #include "dev/button-sensor.h"
 #include "net/rime.h"
 
-#if WITH_UIP6
 #include "net/uip.h"
 #include "net/uip-ds6.h"
 #include "net/uip-debug.h"
 #include "simple-udp.h"
-#else
-#endif//WITH_UIP6
 
 
 
@@ -46,11 +43,7 @@ static struct subscription_list record_sl;
 //const static struct vitalprop_callbacks vitalprop_call = {vp_recv};
 static struct vitalprop_conn vp;
 
-#if WITH_UIP6
 static struct simple_udp_connection vitalcast_connection;
-#else
-static struct unicast_conn vitalcast_connection;
-#endif//WITH_UIP6
 
 //Fake Signal Event
 static process_event_t buffer_flop_event;
@@ -70,13 +63,8 @@ static void vc_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscr
   rm.r_header.r_version=RIPPLECOMM_VERSION;
   rm.r_header.r_msg_type=VITALUCAST_RECORD;
   memcpy(&(rm.r_record),frame_ptr,sizeof(struct ripplecomm_record));
-#if WITH_UIP6
   rm.r_record.r_seqid = uip_htons(rm.r_record.r_seqid);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_record), (uip_ipaddr_t *)subscription_data);
-#else
-  packetbuf_copyfrom(&rm, sizeof(struct ripplecomm_record));
-  unicast_send(&vitalcast_connection, (rimeaddr_t *)subscription_data);
-#endif//WITH_UIP6
 }
 /*---------------------------------------------------------------------------*/
 //subscription callback routine -  UDP unicast data
@@ -88,14 +76,9 @@ static void resp_send(void *frame_ptr, void *data_ptr, subscription_data_t *subs
   rm.r_header.r_version=RIPPLECOMM_VERSION;
   rm.r_header.r_msg_type=RESP_STREAM;
   memcpy(rm.store,rf->store,RESP_STREAM_SIZE*2);
-#if WITH_UIP6
   rm.seq = uip_htons(rf->seq);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_resp), (uip_ipaddr_t *)subscription_data);
-#else
-  rm.seq = rf->seq;
-  packetbuf_copyfrom(&rm, sizeof(struct ripplecomm_resp));
-  unicast_send(&vitalcast_connection, (rimeaddr_t *)subscription_data);
-#endif//WITH_UIP6
+
 }
 /*---------------------------------------------------------------------------*/
 static void ecg_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscription_data)
@@ -106,18 +89,12 @@ static void ecg_send(void *frame_ptr, void *data_ptr, subscription_data_t *subsc
   rm.r_header.r_version=RIPPLECOMM_VERSION;
   rm.r_header.r_msg_type=ECG_STREAM;
   memcpy(rm.store,rf->store,ECG_STREAM_SIZE*2);
-#if WITH_UIP6
   rm.seq = uip_htons(rf->seq);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_ecg), (uip_ipaddr_t *)subscription_data);
-#else
-  rm.seq = rf->seq;
-  packetbuf_copyfrom(&rm, sizeof(struct ripplecomm_ecg));
-  unicast_send(&vitalcast_connection, (rimeaddr_t *)subscription_data);
-#endif//WITH_UIP6
 }
 
 /*---------------------------------------------------------------------------*/
-#if WITH_UIP6
+
 static void
 receiver(struct simple_udp_connection *c,
          const uip_ipaddr_t *sender_addr,
@@ -163,48 +140,8 @@ receiver(struct simple_udp_connection *c,
     }
   }
 }
-#else
-static void
-recv(struct broadcast_conn *bc, const rimeaddr_t *from)
-{
-  struct ripplecomm_header h;
-  //get the header, check message type
-  memcpy(&h, packetbuf_dataptr(),sizeof(struct ripplecomm_header));
-  if (h.r_dispatch == RIPPLECOMM_DISPATCH && h.r_version >= RIPPLECOMM_VERSION_MIN_COMPAT)
-  {
-    //printf("Ripplecomm message received");
-    if (h.r_msg_type == RESP_STREAM_REQUEST)
-    {
-      struct ripplecomm_s_req sr;
-      subscription_data_t sink = {{0}};
-      memcpy(&sr, data, sizeof(struct ripplecomm_s_req));//data no provided with rime, copy from packetbuf
-      memcpy(&(sink),&sr.r_sink,sizeof(rimeaddr_t));
-      //printf("creating respiration subscription");
-      create_subscription(&fake_resp_sl, 1, sr.r_expiration,resp_send, sink);
-    }
-    if (h.r_msg_type == ECG_STREAM_REQUEST)
-    {
-      struct ripplecomm_s_req sr;
-      subscription_data_t sink = {{0}};
-      memcpy(&sr, data, sizeof(struct ripplecomm_s_req));//data no provided with rime, copy from packetbuf
-      memcpy(&(sink),&sr.r_sink,sizeof(rimeaddr_t));
-      //printf("creating ECG subscription");
-      create_subscription(&fake_ecg_sl,1,sr.r_expiration,ecg_send,sink);
-    }
-    if (h.r_msg_type == VITALUCAST_REQUEST)
-    {
-      struct ripplecomm_s_req sr;
-      subscription_data_t sink = {{0}};
-      memcpy(&sr, data, sizeof(struct ripplecomm_s_req));//data no provided with rime, copy from packetbuf
-      memcpy(&(sink),&sr.r_sink,sizeof(rimeaddr_t));
-      //printf("creating record subscription");
-      create_subscription(&record_sl,1,sr.r_expiration,vc_send,sink);
-    }
-  }
-}
-#endif//WITH_UIP6
 /*---------------------------------------------------------------------------*/
-#if WITH_UIP6
+
 static void set_global_address(void)
 {
   uip_ipaddr_t ipaddr;
@@ -225,7 +162,6 @@ static void set_global_address(void)
     }
   }
 }
-#endif//WITH_UIP6
 /*---------------------------------------------------------------------------*/
 static void
 vp_recv(struct vitalprop_conn *c)
@@ -237,12 +173,6 @@ vp_recv(struct vitalprop_conn *c)
 PROCESS(test_subscription_process, "Subscription example");
 PROCESS(fake_signal_process, "fake signal");
 AUTOSTART_PROCESSES(&test_subscription_process);
-#if WITH_UIP6
-
-#else
-static const struct unicast_callbacks unicast_callbacks = {recv};
-
-#endif//WITH_UIP6
 const static struct vitalprop_callbacks vitalprop_call = {vp_recv};
 /*---------------------------------------------------------------------------*/
 
@@ -265,20 +195,12 @@ PROCESS_THREAD(fake_signal_process, ev, data)
     for (i=0;i<RESP_FRAME_CAPACITY;i++)
     {
       resp_val += 1;//increase respiration value
-#if WITH_UIP6
       fake_resp_buffer.write_in->store[i]=uip_htons(resp_val);//uip_htons converts to network byte order, usually used before sending
-#else
-      fake_resp_buffer.write_in->store[i]=resp_val;
-#endif//WITH_UIP6
     }
     for (j=0;j<ECG_FRAME_CAPACITY;j++)
     {
       ecg_val += 1;//increase respiration value
-#if WITH_UIP6
       fake_ecg_buffer.write_in->store[j]=uip_htons(ecg_val);//uip_htons converts to network byte order, usually used before sending
-#else
-      fake_ecg_buffer.write_in->store[j]=ecg_val;
-#endif//WITH_UIP6
     }
 
     //flop buffer, fire signal
@@ -306,12 +228,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   //static struct etimer vtimer;
   static struct ctimer vtimer;
   static int report_mode = 0;// 0 - broadcast, 1 -vitalprop, 2 - unicast to subscribers
-#if WITH_UIP6
   uip_ipaddr_t bcast_addr;
-
-#else
-  //PROCESS_EXITHANDLER(unicast_close(&vitalcast_connection);)
-#endif//WITH_UIP6
   PROCESS_EXITHANDLER(vitalprop_close(&vp);)
   PROCESS_BEGIN();
   resp_frame_buffer_init(&fake_resp_buffer);//this needs to come after process begin
@@ -328,12 +245,8 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   //printf("test process started\n");
   buffer_flop_event = process_alloc_event();
   vital_update_event = process_alloc_event();
-#if WITH_UIP6
   set_global_address();
   simple_udp_register(&vitalcast_connection, UDP_PORT, NULL, UDP_PORT, receiver);
-#else
-  broadcast_open(&vitalcast_connection, VITALUCAST_CHANNEL, &unicast_callbacks);
-#endif//WITH_UIP6
   //start the fake signal (like starting rtimer process)
   process_start(&fake_signal_process, 0);
 
@@ -371,11 +284,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
         //vitalprop mode
         struct ripplecomm_s_req sr;
         subscription_data_t sink = {{0}};
-#if WITH_UIP6
         vitalprop_open(&vp, CLOCK_SECOND*10, UDP_PORT2, &vitalprop_call);
-#else
-        vitalprop_open(&vp, CLOCK_SECOND*10, VITALUCAST_CHANNEL2, &vitalprop_call);
-#endif//WITH_UIP6
         //printf("creating vitalprop ubscription");
         create_subscription(&record_sl,0,sr.r_expiration,vp_update,sink);
       }
@@ -384,14 +293,12 @@ PROCESS_THREAD(test_subscription_process, ev, data)
       {
         //broadcast mode -only with uip
         vitalprop_close(&vp);
-#if WITH_UIP6
         //struct ripplecomm_s_req sr;
         subscription_data_t sink = {{0}};
         uip_create_linklocal_allnodes_mcast(&bcast_addr);
         memcpy(&(sink), &bcast_addr,sizeof(uip_ipaddr_t));
         //printf("creating broadcast ubscription");
         create_subscription(&record_sl,0,0,vc_send,sink);
-#endif//WITH_UIP6
         //report_mode++;
       }
       else if (report_mode ==3 )

@@ -13,11 +13,7 @@
 #include "net/rime/rimeaddr.h"
 #include <stdint.h>
 
-#if WITH_UIP6
 #include "net/uip.h"
-#else
-//rime includes
-#endif//WITH_UIP6
 
 #ifndef RIPPLECOMM_DISPATCH
 #define RIPPLECOMM_DISPATCH 0xD2
@@ -71,11 +67,6 @@ struct ripplecomm_header
   uint8_t r_msg_type : 4;
 };
 
-//struct split_byte {
-//   uint8_t first : 4;
-//   uint8_t second : 4;
-//};
-
 struct ripplecomm_record
 {
   rimeaddr_t record_addr;
@@ -102,11 +93,7 @@ struct ripplecomm_message
 struct ripplecomm_s_req
 {
   struct ripplecomm_header r_header;
-#if WITH_UIP6
   uip_ipaddr_t r_sink;//address to send to
-#else
-  rimeaddr_t r_sink;
-#endif//WITH_UIP6
   uint8_t r_expiration;
 };
 
