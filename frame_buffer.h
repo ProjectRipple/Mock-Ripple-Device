@@ -70,8 +70,8 @@ struct resp_frame_buffer
 {
   struct resp_frame frame1;
   struct resp_frame frame2;
-  struct resp_frame * volatile write_in;
-  struct resp_frame * volatile read_out;
+  struct resp_frame *write_in;
+  struct resp_frame *read_out;
   uint32_t write_in_seq;
 };
 
