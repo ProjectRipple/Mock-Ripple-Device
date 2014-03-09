@@ -30,8 +30,9 @@
 
 
 
-//buffers should probably be declared volatile since an interrupt or
-//other code will likely be making changes to it.
+//buffers could probably be declared volatile since an interrupt
+//service routine or
+//other code will likely be making changes to it in real hardware.
 static struct ripplecomm_record current_vitals = {{0}};
 static struct resp_frame_buffer fake_resp_buffer;
 static struct ecg_frame_buffer fake_ecg_buffer;

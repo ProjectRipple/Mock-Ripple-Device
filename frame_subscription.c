@@ -15,6 +15,8 @@
 #include <string.h>
 #include "frame_subscription.h"
 
+MEMB(subslist, frame_subscription, TOTAL_SUBSCRIPTION_LIST_LIMIT);
+
 /*remove subscription will remove whatever is pointed to by sl->iter, as long as prev points to previous node
 * Careful when using!
 */
@@ -26,13 +28,13 @@ void remove_subscription(struct subscription_list *sl,struct frame_subscription 
   if (prev==NULL)//if this is first node
   {
     sl->head = (sl->iter)->next;
-    free(sl->iter);
+    memb_free(&subslist, sl->iter);
     sl->iter=sl->head;
   }
   else
   {
     prev->next = (sl->iter)->next;
-    free(sl->iter);
+    memb_free(&subslist, sl->iter);
     sl->iter=prev->next;
   }
   //free memory
@@ -83,7 +85,7 @@ void create_subscription(struct subscription_list *sl,uint8_t expires, uint8_t e
   }
   //subscription not found, add new subscription at top of list
   sl->iter = sl->head;
-  sl->head = (struct frame_subscription *)malloc(sizeof(struct frame_subscription));
+  sl->head = (struct frame_subscription *)memb_alloc(&subslist);
   (sl->head)->next = sl->iter;
   (sl->head)->expires = expires;
   (sl->head)->expiration = expiration;
