@@ -46,6 +46,10 @@
 #define ECG_FRAME_CAPACITY 100
 #define PPG_FRAME_CAPACITY 15
 #define RESP_FRAME_CAPACITY 15
+
+//we need to limit the total amount of memory allocated for subscription lists
+#define TOTAL_SUBSCRIPTION_LIST_LIMIT 12
+
 //Note: the desire frames per second should be the product of frame capacity and frames per second
 
 #define  VP_LIST_SIZE 20
