@@ -12,10 +12,11 @@
  */
 
 #include <stdlib.h>
+#include "contiki-net.h"
 #include <string.h>
 #include "frame_subscription.h"
 
-MEMB(subslist, frame_subscription, TOTAL_SUBSCRIPTION_LIST_LIMIT);
+MEMB(subslist, struct frame_subscription, TOTAL_SUBSCRIPTION_LIST_LIMIT);
 
 /*remove subscription will remove whatever is pointed to by sl->iter, as long as prev points to previous node
 * Careful when using!
