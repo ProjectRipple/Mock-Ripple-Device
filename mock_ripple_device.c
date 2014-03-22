@@ -65,6 +65,7 @@ static void vc_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscr
   rm.r_header.r_msg_type=VITALUCAST_RECORD;
   memcpy(&(rm.r_record),frame_ptr,sizeof(struct ripplecomm_record));
   rm.r_record.r_seqid = uip_htons(rm.r_record.r_seqid);
+  rm.r_record.temperature = uip_htons(rm.r_record.temperature);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_record), (uip_ipaddr_t *)subscription_data);
 }
 /*---------------------------------------------------------------------------*/

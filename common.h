@@ -63,8 +63,8 @@ enum RIPPLECOMM_MSG_TYPES
 struct ripplecomm_header
 {
   uint8_t r_dispatch;
-  uint8_t r_version : 4;
   uint8_t r_msg_type : 4;
+  uint8_t r_version : 4;//order of bitfelds is of concern due to endianess and compiler differences
 };
 
 struct ripplecomm_record
@@ -77,7 +77,7 @@ struct ripplecomm_record
   uint8_t heart_rate;
   uint8_t spo2;
   uint8_t bpm;
-  uint8_t temperature;
+  uint16_t temperature;
   uint16_t device_status;//for storing battery or other data TBD
 };
 
