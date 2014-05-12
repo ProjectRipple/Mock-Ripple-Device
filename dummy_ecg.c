@@ -221,7 +221,7 @@ static uint16_t dummy_ecg_array[DUMMY_ECG_SIZE] = {15358,
 
 static uint16_t *dummy_ecg_ptr = &dummy_ecg_array[0];
 static uint16_t *dummy_ecg_head = &dummy_ecg_array[0];
-static uint16_t *dummy_ecg_tail = &dummy_ecg_array[DUMMY_ECG_SIZE];
+static uint16_t *dummy_ecg_tail = &dummy_ecg_array[DUMMY_ECG_SIZE-1];
 
 uint16_t dummy_ecg_next()
 {
