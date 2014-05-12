@@ -14,6 +14,7 @@
 #include "common.h"
 #include "frame_buffer.h"
 #include "frame_subscription.h"
+#include "dummy_ecg.h"
 #include "lib/random.h"
 #include "dev/leds.h"
 #include "sys/etimer.h"
@@ -26,7 +27,6 @@
 #include "net/uip-ds6.h"
 #include "net/uip-debug.h"
 #include "simple-udp.h"
-#include "dummy_ecg.h"
 
 
 

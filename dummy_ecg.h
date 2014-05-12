@@ -9,9 +9,12 @@
  * \author
  *         Adam Renner
  */
-#define DUMMY_ECG_SIZE 207;
-static uint16_t dummy_ecg_array[DUMMY_ECG_SIZE];
-static uint16_t *dummy_ecg_ptr;
-static uint16_t *dummy_ecg_head;
-static uint16_t *dummy_ecg_tail;
+
+#include <stdint.h>
+
+#define DUMMY_ECG_SIZE 207
+
+
+
 uint16_t dummy_ecg_next();
+
