@@ -20,11 +20,11 @@
 #endif
 
 #ifndef RIPPLECOMM_VERSION
-#define RIPPLECOMM_VERSION 1
+#define RIPPLECOMM_VERSION 0x10
 #endif
 
 #ifndef RIPPLECOMM_VERSION_MIN_COMPAT
-#define RIPPLECOMM_VERSION_MIN_COMPAT 1
+#define RIPPLECOMM_VERSION_MIN_COMPAT RIPPLECOMM_VERSION
 #endif
 
 #ifndef RIPPLECOMM_VERSION_COMPATIBLE
@@ -41,9 +41,13 @@
 #define RESP_STREAM_SIZE RESP_FRAME_CAPACITY
 #endif
 
+#ifndef
+#define RIPPLECOMM_MSG_TYPE(x) (((RIPPLECOMM_VERSION << 4) & 0xf0) | ( x & 0x0f))
+#endif // RIPPLECOMM_MSG_TYPE
+
 enum RIPPLECOMM_MSG_TYPES
 {
-  VITALUCAST_REQUEST,
+  VITALUCAST_REQUEST = RIPPLECOMM_VERSION,
   VITALUCAST_RECORD,
   VITALPROP_RECORDS,
   ECG_STREAM_REQUEST,
@@ -63,8 +67,7 @@ enum RIPPLECOMM_MSG_TYPES
 struct ripplecomm_header
 {
   uint8_t r_dispatch;
-  uint8_t r_version : 4;
-  uint8_t r_msg_type : 4;
+  uint8_t r_msg_type;// 4bits version, 4 bits message type
 };
 
 struct ripplecomm_record

@@ -48,7 +48,7 @@
 #define RESP_FRAME_CAPACITY 15
 
 //we need to limit the total amount of memory allocated for subscription lists
-#define TOTAL_SUBSCRIPTION_LIST_LIMIT 12
+#define TOTAL_SUBSCRIPTION_LIST_LIMIT 3
 
 //Note: the desire frames per second should be the product of frame capacity and frames per second
 
@@ -61,14 +61,12 @@
 //Ports for UDP
 #define UDP_PORT 5688
 #define UDP_PORT2 5689
-//Channels if using Rime
-#define VITALUCAST_CHANNEL 225
-#define VITALUCAST_CHANNEL2 226
 
 //ripplecomm messages are identified by a dispatch byte value and a version in the header
 #define RIPPLECOMM_DISPATCH 0xD2
 
-#define RIPPLECOMM_VERSION 0
+//Ripplecomm version should always leave the bottom 4 bits as 0
+#define RIPPLECOMM_VERSION 0x10
 #define RIPPLECOMM_VERSION_COMPATIBLE(x) (RIPPLECOMM_VERSION == x)
 
 #ifdef UIP_CONF_BUFFER_SIZE

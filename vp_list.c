@@ -68,7 +68,6 @@ void vp_list_to_msg(struct vp_list *l, struct ripplecomm_vp_message *m)
     }
   }
   m->header.r_dispatch=RIPPLECOMM_DISPATCH;
-  m->header.r_version=RIPPLECOMM_VERSION;
   m->header.r_msg_type=VITALPROP_RECORDS;
   for (i=0;i<(VP_MSG_RCD_CNT);i++)
   {

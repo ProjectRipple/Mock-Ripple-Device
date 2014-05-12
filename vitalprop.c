@@ -86,7 +86,7 @@ receiver(struct simple_udp_connection *c,
   //       receiver_port, sender_port, datalen);
 
   memcpy(&m, data, datalen);
-  if (m.header.r_dispatch == RIPPLECOMM_DISPATCH && m.header.r_msg_type == VITALPROP_RECORDS && RIPPLECOMM_VERSION_COMPATIBLE(m.header.r_version))
+  if (m.header.r_dispatch == RIPPLECOMM_DISPATCH && m.header.r_msg_type == VITALPROP_RECORDS)
   {
     vp_list_from_msg(&(vpc->vl),m);
     vpc->cb->recv(vpc);//need to send this a vitalprop_conneciton struct, not simple_udp_connection

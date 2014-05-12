@@ -9,7 +9,6 @@
  * \author
  *         Adam Renner
  */
-//#define WITH_UIP6
 
 #include "contiki.h"
 #include "common.h"
@@ -27,6 +26,7 @@
 #include "net/uip-ds6.h"
 #include "net/uip-debug.h"
 #include "simple-udp.h"
+#include "dummy_ecg.h"
 
 
 
@@ -54,8 +54,7 @@ static void vc_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscr
 {
   struct ripplecomm_message rm;
   rm.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
-  rm.r_header.r_version=RIPPLECOMM_VERSION;
-  rm.r_header.r_msg_type=VITALUCAST_RECORD;
+  rm.r_header.r_msg_type = VITALUCAST_RECORD;
   memcpy(&(rm.r_record),frame_ptr,sizeof(struct ripplecomm_record));
   rm.r_record.r_seqid = uip_htons(rm.r_record.r_seqid);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_record), (uip_ipaddr_t *)subscription_data);
@@ -67,8 +66,7 @@ static void resp_send(void *frame_ptr, void *data_ptr, subscription_data_t *subs
   struct ripplecomm_resp rm;
   struct resp_frame *rf = (struct resp_frame *)frame_ptr;
   rm.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
-  rm.r_header.r_version=RIPPLECOMM_VERSION;
-  rm.r_header.r_msg_type=RESP_STREAM;
+  rm.r_header.r_msg_type = RESP_STREAM;
   memcpy(rm.store,rf->store,RESP_STREAM_SIZE*2);
   rm.seq = uip_htons(rf->seq);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_resp), (uip_ipaddr_t *)subscription_data);
@@ -80,8 +78,7 @@ static void ecg_send(void *frame_ptr, void *data_ptr, subscription_data_t *subsc
   struct ripplecomm_ecg rm;
   struct ecg_frame *rf = (struct ecg_frame *)frame_ptr;
   rm.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
-  rm.r_header.r_version=RIPPLECOMM_VERSION;
-  rm.r_header.r_msg_type=ECG_STREAM;
+  rm.r_header.r_msg_type = ECG_STREAM;
   memcpy(rm.store,rf->store,ECG_STREAM_SIZE*2);
   rm.seq = uip_htons(rf->seq);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_ecg), (uip_ipaddr_t *)subscription_data);
@@ -102,7 +99,7 @@ receiver(struct simple_udp_connection *c,
   //printf("Data received on port %d from port %d with length %d\n", receiver_port, sender_port, datalen);
   memcpy(&h, data, sizeof(struct ripplecomm_header));
 
-  if (h.r_dispatch == RIPPLECOMM_DISPATCH && h.r_version >= RIPPLECOMM_VERSION_MIN_COMPAT)
+  if (h.r_dispatch == RIPPLECOMM_DISPATCH && h.r_msg_type >= RIPPLECOMM_VERSION_MIN_COMPAT)
   {
     //printf("Ripplecomm message received\n");
     if (h.r_msg_type == RESP_STREAM_REQUEST)
@@ -186,7 +183,7 @@ PROCESS_THREAD(fake_signal_process, ev, data)
     }
     for (j=0;j<ECG_FRAME_CAPACITY;j++)
     {
-      ecg_val += 1;//increase respiration value
+      ecg_val = dummy_ecg_next();
       fake_ecg_buffer.write_in->store[j]=uip_htons(ecg_val);//uip_htons converts to network byte order, usually used before sending
     }
 
@@ -215,7 +212,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   //static struct etimer vtimer;
   static struct ctimer vtimer;
   static int report_mode = 0;// 0 - broadcast, 1 -vitalprop, 2 - unicast to subscribers
-  uip_ipaddr_t bcast_addr;
+  uip_ipaddr_t sink_addr;
   PROCESS_BEGIN();
   resp_frame_buffer_init(&fake_resp_buffer);//this needs to come after process begin
   ecg_frame_buffer_init(&fake_ecg_buffer);
@@ -241,7 +238,6 @@ PROCESS_THREAD(test_subscription_process, ev, data)
 
   while(1)
   {
-    //etimer_set(&vtimer, CLOCK_SECOND);
 
     PROCESS_YIELD();
     if(ev == buffer_flop_event)
@@ -255,29 +251,22 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     }
     else if (ev == sensors_event && data == &button_sensor)
     {
-      if (report_mode == 2)
-      {
-        report_mode = 0;
-      }
       report_mode++;
       printf("Report Mode %d\n", report_mode);
-      //switch between unicast request only, broadcast, and vitalprop modes
-      //on mode switch, clear all subscriptions, create new ones, this will even clear requested unicast subscriptions
       clear_subscriptions(&record_sl);
 
       if (report_mode == 1 )
       {
-        //broadcast mode -only with uip
+        //send to aaaa::1
         subscription_data_t sink = {{0}};
-        uip_create_linklocal_allnodes_mcast(&bcast_addr);
-        memcpy(&(sink), &bcast_addr,sizeof(uip_ipaddr_t));
-        //printf("creating broadcast ubscription");
+        uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+        memcpy(&(sink), &sink_addr,sizeof(uip_ipaddr_t));
         create_subscription(&record_sl,0,0,vc_send,sink);
       }
       else if (report_mode ==2 )
       {
         //return to default request only mode
-        //vitalprop_close(&vp);
+        report_mode = 0;
       }
 
     }

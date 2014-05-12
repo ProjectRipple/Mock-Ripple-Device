@@ -151,7 +151,6 @@ PROCESS_THREAD(test_requestor_process, ev, data)
         //device_mode++;
         //printf("Requesting Respiration Subscription\n");
         m.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
-        m.r_header.r_version=RIPPLECOMM_VERSION;
         m.r_header.r_msg_type=RESP_STREAM_REQUEST;
         //m.r_sink = *ipaddr;
         uip_ipaddr_copy((&m.r_sink),(&myaddr));
@@ -164,7 +163,6 @@ PROCESS_THREAD(test_requestor_process, ev, data)
         //device_mode++;
         //printf("Requesting ECG Subscription\n");
         m.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
-        m.r_header.r_version=RIPPLECOMM_VERSION;
         m.r_header.r_msg_type=ECG_STREAM_REQUEST;
         uip_ipaddr_copy((&m.r_sink),(&myaddr));
         m.r_expiration=0x0F;
@@ -176,7 +174,6 @@ PROCESS_THREAD(test_requestor_process, ev, data)
         //device_mode = 0;
         //printf("Requesting RippleMessage Subscription\n");
         m.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
-        m.r_header.r_version=RIPPLECOMM_VERSION;
         m.r_header.r_msg_type=VITALUCAST_REQUEST;
         uip_ipaddr_copy((&m.r_sink),(&myaddr));
         m.r_expiration=0x0F;
