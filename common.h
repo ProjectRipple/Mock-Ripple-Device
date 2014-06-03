@@ -69,14 +69,12 @@ struct ripplecomm_header
 struct ripplecomm_record
 {
   rimeaddr_t record_addr;
+  uip_ipaddr_t device_ipv6;
   uint16_t r_seqid;
-  //struct split_byte age_hops;//age in interval counts, hops in hop counts
-  uint8_t r_est_age;//age in interval counts
-  uint8_t r_hops;//hop counts
   uint8_t heart_rate;
   uint8_t spo2;
   uint8_t bpm;
-  uint8_t temperature;
+  uint16_t temperature;
   uint16_t device_status;//for storing battery or other data TBD
 };
 

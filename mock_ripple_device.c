@@ -28,7 +28,7 @@
 #include "net/uip-debug.h"
 #include "simple-udp.h"
 
-
+#include "mqtt-sn.h"
 
 //buffers could probably be declared volatile since an interrupt
 //service routine or
@@ -40,7 +40,29 @@ static struct subscription_list fake_resp_sl;
 static struct subscription_list fake_ecg_sl;
 static struct subscription_list record_sl;
 
+static struct mqtt_sn_connection mqtt_sn_c;
+static uip_ipaddr_t sink_addr;
+//static char device_id[17];
+static char device_id[] = "00000000";//64 bit unique id
+static struct etimer periodic_timer;
+//static char *mqtt_client_id="sensor";
+static char pub_topic[] = "P_Stats/00000000/vitalcast";
+static uint16_t ctrl_topic_id;
+static uint16_t publisher_topic_id;
+static publish_packet_t incoming_packet;
+static uint16_t ctrl_topic_msg_id;
+static uint16_t reg_topic_msg_id;
+static int8_t qos = 1;
+static uint8_t retain = FALSE;
+static clock_time_t send_interval;
+static mqtt_sn_subscribe_request subreq;
+static mqtt_sn_register_request regreq;
+//uint8_t debug = FALSE;
 
+static enum mqttsn_connection_status connection_state = MQTTSN_DISCONNECTED;
+
+/*A few events for managing device state*/
+static process_event_t mqttsn_connack_event;
 
 static struct simple_udp_connection vitalcast_connection;
 
@@ -48,6 +70,9 @@ static struct simple_udp_connection vitalcast_connection;
 static process_event_t buffer_flop_event;
 static process_event_t vital_update_event;
 
+
+PROCESS(example_mqttsn_process, "Configure Connection and Topic Registration");
+PROCESS(publish_process, "register topic and publish data");
 /*---------------------------------------------------------------------------*/
 //subscription callback routine -  UDP unicast data
 static void vc_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscription_data)
@@ -58,6 +83,20 @@ static void vc_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscr
   memcpy(&(rm.r_record),frame_ptr,sizeof(struct ripplecomm_record));
   rm.r_record.r_seqid = uip_htons(rm.r_record.r_seqid);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_record), (uip_ipaddr_t *)subscription_data);
+}
+
+/*---------------------------------------------------------------------------*/
+//mqtt-sn callback routine
+static void vc_mqttsn(void *frame_ptr, void *data_ptr, subscription_data_t *subscription_data)
+{
+  struct ripplecomm_message rm;
+  rm.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
+  rm.r_header.r_msg_type = VITALUCAST_RECORD;
+  memcpy(&(rm.r_record),frame_ptr,sizeof(struct ripplecomm_record));
+  rm.r_record.r_seqid = uip_htons(rm.r_record.r_seqid);
+  rm.r_record.temperature = uip_htons(rm.r_record.temperature);
+  printf("publishing \n ");
+  mqtt_sn_send_publish(&mqtt_sn_c, publisher_topic_id,MQTT_SN_TOPIC_TYPE_NORMAL,&(rm.r_record), sizeof(struct ripplecomm_record),MQTT_QOS,MQTT_RETAIN);
 }
 /*---------------------------------------------------------------------------*/
 //subscription callback routine -  UDP unicast data
@@ -133,31 +172,58 @@ receiver(struct simple_udp_connection *c,
 }
 /*---------------------------------------------------------------------------*/
 
-static void set_global_address(void)
+/*---------------------------------------------------------------------------*/
+static void
+puback_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr, const uint8_t *data, uint16_t datalen)
 {
-  uip_ipaddr_t ipaddr;
-  int i;
-  uint8_t state;
-
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
-
-  printf("IPv6 addresses: ");
-  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
-    state = uip_ds6_if.addr_list[i].state;
-    if(uip_ds6_if.addr_list[i].isused &&
-       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
-      uip_debug_ipaddr_print(&uip_ds6_if.addr_list[i].ipaddr);
-      printf("\n");
+  printf("Puback received\n");
+}
+/*---------------------------------------------------------------------------*/
+static void
+connack_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr, const uint8_t *data, uint16_t datalen)
+{
+  uint8_t connack_return_code;
+  connack_return_code = *(data + 3);
+  printf("Connack received\n");
+  if (connack_return_code == ACCEPTED) {
+    process_post(&example_mqttsn_process, mqttsn_connack_event, NULL);
+  } else {
+    printf("Connack error: %s\n", mqtt_sn_return_code_string(connack_return_code));
+  }
+}
+/*---------------------------------------------------------------------------*/
+static void
+regack_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr, const uint8_t *data, uint16_t datalen)
+{
+  regack_packet_t incoming_regack;
+  memcpy(&incoming_regack, data, datalen);
+  printf("Regack received\n");
+  if (incoming_regack.message_id == reg_topic_msg_id) {
+    if (incoming_regack.return_code == ACCEPTED) {
+      publisher_topic_id = uip_htons(incoming_regack.topic_id);
+    } else {
+      printf("Regack error: %s\n", mqtt_sn_return_code_string(incoming_regack.return_code));
     }
   }
 }
+/*---------------------------------------------------------------------------*/
+/*Add callbacks here if we make them*/
+static const struct mqtt_sn_callbacks mqtt_sn_call = {
+  NULL,
+  NULL,
+  NULL,
+  connack_receiver,
+  regack_receiver,
+  puback_receiver,
+  NULL,
+  NULL,
+  NULL
+  };
 
 /*---------------------------------------------------------------------------*/
-PROCESS(test_subscription_process, "Subscription example");
+PROCESS(mock_device_process, "Subscription example");
 PROCESS(fake_signal_process, "fake signal");
-AUTOSTART_PROCESSES(&test_subscription_process);
+AUTOSTART_PROCESSES(&mock_device_process);
 /*---------------------------------------------------------------------------*/
 
 
@@ -190,37 +256,155 @@ PROCESS_THREAD(fake_signal_process, ev, data)
     //flop buffer, fire signal
     resp_frame_buffer_swap(&fake_resp_buffer);
     ecg_frame_buffer_swap(&fake_ecg_buffer);
-    process_post(&test_subscription_process, buffer_flop_event, 0);
+    process_post(&mock_device_process, buffer_flop_event, 0);
   }
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+/*this process will publish data at regular intervals*/
+PROCESS_THREAD(publish_process, ev, data)
+{
+  static uint8_t registration_tries;
+  static struct etimer send_timer;
+  static uint8_t buf_len;
+  static uint8_t message_number;
+  static char buf[20];
+  static mqtt_sn_register_request *rreq = &regreq;
 
+  PROCESS_BEGIN();
+
+  sprintf(pub_topic,"P_Stats/%s/vitalcast",device_id);
+
+  printf("registering topic\n");
+  registration_tries =0;
+  while (registration_tries < MQTT_REQUEST_RETRIES)
+  {
+    reg_topic_msg_id = mqtt_sn_register_try(rreq,&mqtt_sn_c,pub_topic,MQTT_REPLY_TIMEOUT);
+    PROCESS_WAIT_EVENT_UNTIL(mqtt_sn_request_returned(rreq));
+    if (mqtt_sn_request_success(rreq)) {
+      registration_tries = 4;
+      printf("registration acked\n");
+    }
+    else {
+      registration_tries++;
+      if (rreq->state == MQTTSN_REQUEST_FAILED) {
+          printf("Regack error: %s\n", mqtt_sn_return_code_string(rreq->return_code));
+      }
+    }
+  }
+  if (mqtt_sn_request_success(rreq)){
+    //start topic publishing to topic at regular intervals
+    subscription_data_t sink = {{0}};
+    create_subscription(&record_sl,0,0,vc_mqttsn,sink);
+  } else {
+    printf("unable to register topic\n");
+  }
+  PROCESS_END();
+}
+
+/*---------------------------------------------------------------------------*/
+/*this main mqtt process will create connection and register topics*/
+/*---------------------------------------------------------------------------*/
+static struct ctimer connection_timer;
+static process_event_t connection_timeout_event;
+
+static void connection_timer_callback(void *mqc)
+{
+  process_post(&example_mqttsn_process, connection_timeout_event, NULL);
+}
+
+PROCESS_THREAD(example_mqttsn_process, ev, data)
+{
+
+  static uip_ipaddr_t broker_addr;
+  static uint8_t connection_retries = 0;
+
+  PROCESS_BEGIN();
+
+  mqttsn_connack_event = process_alloc_event();
+
+  mqtt_sn_set_debug(1);
+  uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+  //uip_ip6addr(&broker_addr, 0x2001, 0x0db8, 1, 0xffff, 0, 0, 0xc0a8, 0xd480);//192.168.212.128 with tayga
+  //uip_ip6addr(&broker_addr, 0xaaaa, 0, 2, 0xeeee, 0, 0, 0xc0a8, 0xd480);//192.168.212.128 with tayga
+  //uip_ip6addr(&broker_addr, 0xaaaa, 0, 2, 0xeeee, 0, 0, 0xac10, 0xdc01);//172.16.220.1 with tayga
+  //uip_ip6addr(&broker_addr, 0xaaaa, 0, 2, 0xeeee, 0, 0, 0xac10, 0xdc80);//172.16.220.128 with tayga
+  mqtt_sn_create_socket(&mqtt_sn_c,MQTT_UDP_PORT, &sink_addr, MQTT_UDP_PORT);
+  (&mqtt_sn_c)->mc = &mqtt_sn_call;
+
+  sprintf(device_id,"%02X%02X%02X%02X%02X%02X%02X%02X",rimeaddr_node_addr.u8[0],
+          rimeaddr_node_addr.u8[1],rimeaddr_node_addr.u8[2],rimeaddr_node_addr.u8[3],
+          rimeaddr_node_addr.u8[4],rimeaddr_node_addr.u8[5],rimeaddr_node_addr.u8[6],
+          rimeaddr_node_addr.u8[7]);
+
+  /*Request a connection and wait for connack*/
+  printf("requesting connection \n ");
+  connection_timeout_event = process_alloc_event();
+  ctimer_set( &connection_timer, MQTT_REPLY_TIMEOUT, connection_timer_callback, NULL);
+  mqtt_sn_send_connect(&mqtt_sn_c,device_id,MQTT_KEEP_ALIVE);
+  connection_state = MQTTSN_WAITING_CONNACK;
+  while (connection_retries < MQTT_REQUEST_RETRIES)
+  {
+    PROCESS_WAIT_EVENT();
+    if (ev == mqttsn_connack_event) {
+      //if success
+      printf("connection acked\n");
+      ctimer_stop(&connection_timer);
+      connection_state = MQTTSN_CONNECTED;
+      connection_retries = MQTT_REQUEST_RETRIES;//using break here may mess up switch statement of proces
+    }
+    if (ev == connection_timeout_event) {
+      connection_state = MQTTSN_CONNECTION_FAILED;
+      connection_retries++;
+      printf("connection timeout\n");
+      ctimer_restart(&connection_timer);
+      if (connection_retries < MQTT_REQUEST_RETRIES) {
+        mqtt_sn_send_connect(&mqtt_sn_c,device_id,MQTT_KEEP_ALIVE);
+        connection_state = MQTTSN_WAITING_CONNACK;
+      }
+    }
+  }
+  ctimer_stop(&connection_timer);
+  if (connection_state == MQTTSN_CONNECTED){
+    process_start(&publish_process, 0);
+    //monitor connection
+    while(1)
+    {
+      PROCESS_WAIT_EVENT();
+    }
+  } else {
+    printf("unable to connect\n");
+  }
+  PROCESS_END();
+}
+/*---------------------------------------------------------------------------*/
 static void current_vitals_update(void *ptr)
 {
   current_vitals.r_seqid++;
   current_vitals.heart_rate++;
   current_vitals.temperature++;
   current_vitals.spo2++;
+  uip_ipaddr_copy(&(current_vitals.device_ipv6),&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
   execute_subscription_callbacks(&record_sl,&current_vitals,NULL);
-  process_post(&test_subscription_process, vital_update_event, 0);
+  process_post(&mock_device_process, vital_update_event, 0);
 }
 
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(test_subscription_process, ev, data)
+PROCESS_THREAD(mock_device_process, ev, data)
 {
   //static struct etimer vtimer;
   static struct ctimer vtimer;
   static int report_mode = 0;// 0 - broadcast, 1 -vitalprop, 2 - unicast to subscribers
-  uip_ipaddr_t sink_addr;
+
   PROCESS_BEGIN();
+  mqtt_sn_set_debug(1);
+
   resp_frame_buffer_init(&fake_resp_buffer);//this needs to come after process begin
   ecg_frame_buffer_init(&fake_ecg_buffer);
   init_subscription_list(&fake_resp_sl);
   init_subscription_list(&fake_ecg_sl);
   init_subscription_list(&record_sl);
-  //Create some generic vital values:
-  //current_vitals = {{0}};
+  //give node unique id
   current_vitals.record_addr=rimeaddr_node_addr;
   current_vitals.r_seqid=0;
   current_vitals.heart_rate=1;
@@ -228,13 +412,22 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   //printf("test process started\n");
   buffer_flop_event = process_alloc_event();
   vital_update_event = process_alloc_event();
-  set_global_address();
+  //set_global_address();
+  uip_ipaddr_copy(&(current_vitals.device_ipv6),&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
   simple_udp_register(&vitalcast_connection, UDP_PORT, NULL, UDP_PORT, receiver);
+
+  sprintf(device_id,"%02X%02X%02X%02X%02X%02X%02X%02X",rimeaddr_node_addr.u8[0],
+          rimeaddr_node_addr.u8[1],rimeaddr_node_addr.u8[2],rimeaddr_node_addr.u8[3],
+          rimeaddr_node_addr.u8[4],rimeaddr_node_addr.u8[5],rimeaddr_node_addr.u8[6],
+          rimeaddr_node_addr.u8[7]);
+
   //start the fake signal (like starting rtimer process)
   process_start(&fake_signal_process, 0);
 
   SENSORS_ACTIVATE(button_sensor);
-  ctimer_set(&vtimer, CLOCK_SECOND*3,current_vitals_update,NULL);
+  //wait for RPL to provide us with host address
+  ctimer_set(&vtimer, STARTUP_DELAY,current_vitals_update,NULL);
+  process_start(&example_mqttsn_process, 0);
 
   while(1)
   {
@@ -249,27 +442,27 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     {
       ctimer_set(&vtimer, CLOCK_SECOND*3,current_vitals_update,NULL);
     }
-    else if (ev == sensors_event && data == &button_sensor)
-    {
-      report_mode++;
-      printf("Report Mode %d\n", report_mode);
-      clear_subscriptions(&record_sl);
-
-      if (report_mode == 1 )
-      {
-        //send to aaaa::1
-        subscription_data_t sink = {{0}};
-        uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-        memcpy(&(sink), &sink_addr,sizeof(uip_ipaddr_t));
-        create_subscription(&record_sl,0,0,vc_send,sink);
-      }
-      else if (report_mode ==2 )
-      {
-        //return to default request only mode
-        report_mode = 0;
-      }
-
-    }
+//    else if (ev == sensors_event && data == &button_sensor)
+//    {
+//      report_mode++;
+//      printf("Report Mode %d\n", report_mode);
+//      clear_subscriptions(&record_sl);
+//
+//      if (report_mode == 1 )
+//      {
+//        //send to aaaa::1
+//        subscription_data_t sink = {{0}};
+//        uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+//        memcpy(&(sink), &sink_addr,sizeof(uip_ipaddr_t));
+//        create_subscription(&record_sl,0,0,vc_send,sink);
+//      }
+//      else if (report_mode ==2 )
+//      {
+//        //return to default request only mode
+//        report_mode = 0;
+//      }
+//
+//    }
   }
   PROCESS_END();
 }

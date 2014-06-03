@@ -50,6 +50,18 @@
 //we need to limit the total amount of memory allocated for subscription lists
 #define TOTAL_SUBSCRIPTION_LIST_LIMIT 3
 
+//timing parameters
+#define STARTUP_DELAY (20 * CLOCK_SECOND)
+#define PERIODIC_DELAY (5 * CLOCK_SECOND)
+
+//mqtt-sn parameters
+#define MQTT_KEEP_ALIVE 0
+#define MQTT_QOS 0
+#define MQTT_RETAIN TRUE
+#define MQTT_REQUEST_RETRIES 5
+#define MQTT_REPLY_TIMEOUT (3 * CLOCK_SECOND)
+#define MQTT_UDP_PORT 1884
+
 //Note: the desire frames per second should be the product of frame capacity and frames per second
 
 #define  VP_LIST_SIZE 20
