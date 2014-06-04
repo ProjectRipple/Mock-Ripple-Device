@@ -245,7 +245,7 @@ void mqtt_sn_send_connect(struct mqtt_sn_connection *mqc, const char* client_id,
 uint16_t mqtt_sn_send_register(struct mqtt_sn_connection *mqc, const char* topic_name);
 #endif
 #if 1
-uint16_t mqtt_sn_send_publish(struct mqtt_sn_connection *mqc, uint16_t topic_id, uint8_t topic_type, const char* data, uint16_t data_len, int8_t qos, uint8_t retain);
+uint16_t mqtt_sn_send_publish(struct mqtt_sn_connection *mqc, uint16_t topic_id, uint8_t topic_type, void* data, uint16_t data_len, int8_t qos, uint8_t retain);
 #endif
 #if 1
 uint16_t mqtt_sn_send_subscribe(struct mqtt_sn_connection *mqc, const char* topic_name, uint8_t qos);
