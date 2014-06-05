@@ -40,6 +40,7 @@ static struct subscription_list fake_resp_sl;
 static struct subscription_list fake_ecg_sl;
 static struct subscription_list record_sl;
 
+static char device_id[] = "0000000000000000";//64 bit unique id
 
 
 static struct simple_udp_connection vitalcast_connection;
@@ -57,7 +58,8 @@ static void vc_send(void *frame_ptr, void *data_ptr, subscription_data_t *subscr
   rm.r_header.r_msg_type = VITALUCAST_RECORD;
   memcpy(&(rm.r_record),frame_ptr,sizeof(struct ripplecomm_record));
   rm.r_record.r_seqid = uip_htons(rm.r_record.r_seqid);
-  simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_record), (uip_ipaddr_t *)subscription_data);
+  rm.r_record.temperature = uip_htons(rm.r_record.temperature);
+  simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_message), (uip_ipaddr_t *)subscription_data);
 }
 /*---------------------------------------------------------------------------*/
 //subscription callback routine -  UDP unicast data
@@ -203,6 +205,7 @@ static void current_vitals_update(void *ptr)
   current_vitals.temperature++;
   current_vitals.spo2++;
   execute_subscription_callbacks(&record_sl,&current_vitals,NULL);
+  uip_ipaddr_copy(&(current_vitals.device_ipv6),&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
   process_post(&test_subscription_process, vital_update_event, 0);
 }
 
@@ -229,6 +232,13 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   buffer_flop_event = process_alloc_event();
   vital_update_event = process_alloc_event();
   set_global_address();
+
+  sprintf(device_id,"%02X%02X%02X%02X%02X%02X%02X%02X",rimeaddr_node_addr.u8[0],
+          rimeaddr_node_addr.u8[1],rimeaddr_node_addr.u8[2],rimeaddr_node_addr.u8[3],
+          rimeaddr_node_addr.u8[4],rimeaddr_node_addr.u8[5],rimeaddr_node_addr.u8[6],
+          rimeaddr_node_addr.u8[7]);
+
+  uip_ipaddr_copy(&(current_vitals.device_ipv6),&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
   simple_udp_register(&vitalcast_connection, UDP_PORT, NULL, UDP_PORT, receiver);
   //start the fake signal (like starting rtimer process)
   process_start(&fake_signal_process, 0);
