@@ -10,10 +10,14 @@
  *         Adam Renner
  */
 
-#include "net/rime/rimeaddr.h"
+// rimeaddr changed to linkaddr
+//#include "net/rime/rimeaddr.h"
+#include "net/linkaddr.h"
 #include <stdint.h>
 
-#include "net/uip.h"
+// uip moved to net/ip/uip.h
+//#include "net/uip.h"
+#include "net/ip/uip.h"
 
 #ifndef RIPPLECOMM_DISPATCH
 #define RIPPLECOMM_DISPATCH 0xD2
@@ -68,7 +72,9 @@ struct ripplecomm_header
 
 struct ripplecomm_record
 {
-  rimeaddr_t record_addr;
+  //rimeaddr_t record_addr;
+  linkaddr_t record_addr;
+  uip_ipaddr_t device_ipv6;
   uint16_t r_seqid;
   uint8_t heart_rate;
   uint8_t spo2;

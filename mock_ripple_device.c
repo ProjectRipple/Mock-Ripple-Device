@@ -21,11 +21,18 @@
 #include <stdio.h>
 #include <string.h>
 #include "dev/button-sensor.h"
-#include "net/rime.h"
 
+/*
+#include "net/rime.h"
 #include "net/uip.h"
 #include "net/uip-ds6.h"
 #include "net/uip-debug.h"
+*/
+#include "net/rime/rime.h"
+#include "net/ip/uip.h"
+#include "net/ipv6/uip-ds6.h"
+#include "net/ip/uip-debug.h"
+
 #include "simple-udp.h"
 
 
@@ -103,7 +110,7 @@ receiver(struct simple_udp_connection *c,
 
   if (h.r_dispatch == RIPPLECOMM_DISPATCH && h.r_msg_type >= RIPPLECOMM_VERSION_MIN_COMPAT)
   {
-    //printf("Ripplecomm message received\n");
+    printf("Ripplecomm message received\n");
     if (h.r_msg_type == RESP_STREAM_REQUEST)
     {
       struct ripplecomm_s_req sr;
@@ -119,7 +126,7 @@ receiver(struct simple_udp_connection *c,
       subscription_data_t sink = {{0}};
       memcpy(&sr, data, sizeof(struct ripplecomm_s_req));
       memcpy(&(sink),&sr.r_sink,sizeof(uip_ipaddr_t));
-      //printf("creating ecg subscription\n");
+      printf("creating ecg subscription\n");
       create_subscription(&fake_ecg_sl, 1, sr.r_expiration, ecg_send, sink);
     }
     if (h.r_msg_type == VITALUCAST_REQUEST)
@@ -224,7 +231,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   init_subscription_list(&record_sl);
   //Create some generic vital values:
   //current_vitals = {{0}};
-  current_vitals.record_addr=rimeaddr_node_addr;
+  current_vitals.record_addr=linkaddr_node_addr;
   current_vitals.r_seqid=0;
   current_vitals.heart_rate=1;
   current_vitals.temperature = 2;
@@ -233,10 +240,10 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   vital_update_event = process_alloc_event();
   set_global_address();
 
-  sprintf(device_id,"%02X%02X%02X%02X%02X%02X%02X%02X",rimeaddr_node_addr.u8[0],
-          rimeaddr_node_addr.u8[1],rimeaddr_node_addr.u8[2],rimeaddr_node_addr.u8[3],
-          rimeaddr_node_addr.u8[4],rimeaddr_node_addr.u8[5],rimeaddr_node_addr.u8[6],
-          rimeaddr_node_addr.u8[7]);
+  sprintf(device_id,"%02X%02X%02X%02X%02X%02X%02X%02X",linkaddr_node_addr.u8[0],
+          linkaddr_node_addr.u8[1],linkaddr_node_addr.u8[2],linkaddr_node_addr.u8[3],
+          linkaddr_node_addr.u8[4],linkaddr_node_addr.u8[5],linkaddr_node_addr.u8[6],
+          linkaddr_node_addr.u8[7]);
 
   uip_ipaddr_copy(&(current_vitals.device_ipv6),&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
   simple_udp_register(&vitalcast_connection, UDP_PORT, NULL, UDP_PORT, receiver);
@@ -269,7 +276,8 @@ PROCESS_THREAD(test_subscription_process, ev, data)
       {
         //send to aaaa::1
         subscription_data_t sink = {{0}};
-        uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+        uip_ip6addr(&sink_addr, 0xabcd, 0, 0, 0, 0xba27, 0xebff, 0xfe79, 0xaf4b);
+	//uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
         memcpy(&(sink), &sink_addr,sizeof(uip_ipaddr_t));
         create_subscription(&record_sl,0,0,vc_send,sink);
       }
