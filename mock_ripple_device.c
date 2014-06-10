@@ -175,16 +175,24 @@ PROCESS_THREAD(fake_signal_process, ev, data)
   static uint16_t resp_val;
   static uint16_t ecg_val;
   static struct etimer et;
+  static int i,j;
   PROCESS_BEGIN();
   //printf("fake signal started!\n");
 
   while(1) {
-    etimer_set(&et, CLOCK_SECOND/STREAM_FRAMES_PER_SECOND);
+    etimer_set(&et, CLOCK_SECOND/(CLOCK_CONF_SECOND*1.2));
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     //memset(fake_ecg_buffer.write_in->store,0,ECG_FRAME_CAPACITY);
     //memset(resp_frame_buffer.write_in->store,0,RESP_FRAME_CAPACITY);
+    fake_ecg_buffer.write_in->store[j]=uip_htons(ecg_val);
+    j++;
+    if (j == ECG_FRAME_CAPACITY) {
+      j = 0;
+      ecg_frame_buffer_swap(&fake_ecg_buffer);
+      process_post(&test_subscription_process, buffer_flop_event, 0);
+    }
 
-    int i,j;
+    /*int i,j;
     for (i=0;i<RESP_FRAME_CAPACITY;i++)
     {
       resp_val += 1;//increase respiration value
@@ -194,12 +202,11 @@ PROCESS_THREAD(fake_signal_process, ev, data)
     {
       ecg_val = dummy_ecg_next();
       fake_ecg_buffer.write_in->store[j]=uip_htons(ecg_val);//uip_htons converts to network byte order, usually used before sending
-    }
+    }*/
 
     //flop buffer, fire signal
-    resp_frame_buffer_swap(&fake_resp_buffer);
-    ecg_frame_buffer_swap(&fake_ecg_buffer);
-    process_post(&test_subscription_process, buffer_flop_event, 0);
+    //resp_frame_buffer_swap(&fake_resp_buffer);
+    
   }
   PROCESS_END();
 }

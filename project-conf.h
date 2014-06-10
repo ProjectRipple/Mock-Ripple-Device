@@ -89,6 +89,11 @@
 #define NETSTACK_CONF_RDC nullrdc_driver
 
 
+#ifdef CLOCK_CONF_SECOND
+#undef CLOCK_CONF_SECOND
+#define CLOCK_CONF_SECOND 200
+#endif
+
 //#define NODE_TYPE_COLLECTOR 1
 
 //#define NETSTACK_CONF_NETWORK rime_driver
