@@ -37,6 +37,7 @@
 
 #ifdef REAL_SENSORS
 #include "uart.h"
+#include "math.h"
 #endif
 
 
@@ -229,6 +230,8 @@ PROCESS_THREAD(fake_signal_process, ev, data)
 static void current_vitals_update(void *ptr)
 {
   uint8_t status = 0;
+  double resistance = 0;
+  double temperatureD = 0;
 #ifdef REAL_SENSORS
   adc_service();
   resistance = TEMPERATURE_RESISTOR / (((double)(adc_vbatt)/(double)adc_voltage(4)) - 1.0);
