@@ -180,7 +180,7 @@ PROCESS_THREAD(fake_signal_process, ev, data)
   //printf("fake signal started!\n");
 
   while(1) {
-    etimer_set(&et, CLOCK_SECOND/(CLOCK_CONF_SECOND*1.2));
+    etimer_set(&et, CLOCK_SECOND/(CLOCK_CONF_SECOND));
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     //memset(fake_ecg_buffer.write_in->store,0,ECG_FRAME_CAPACITY);
     //memset(resp_frame_buffer.write_in->store,0,RESP_FRAME_CAPACITY);
@@ -266,6 +266,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     PROCESS_YIELD();
     if(ev == buffer_flop_event)
     {
+      printf("new ecg frame\n");
       execute_subscription_callbacks(&fake_resp_sl,fake_resp_buffer.read_out,NULL);
       execute_subscription_callbacks(&fake_ecg_sl,fake_ecg_buffer.read_out,NULL);
     }
