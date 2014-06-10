@@ -35,6 +35,10 @@
 
 #include "simple-udp.h"
 
+#ifdef REAL_SENSORS
+#include "uart.h"
+#endif
+
 
 
 //buffers could probably be declared volatile since an interrupt
@@ -49,6 +53,7 @@ static struct subscription_list record_sl;
 
 static char device_id[] = "0000000000000000";//64 bit unique id
 
+static const double TEMPERATURE_RESISTOR = 2200.0;
 
 static struct simple_udp_connection vitalcast_connection;
 
@@ -179,12 +184,21 @@ PROCESS_THREAD(fake_signal_process, ev, data)
   PROCESS_BEGIN();
   //printf("fake signal started!\n");
 
+
   while(1) {
     etimer_set(&et, CLOCK_SECOND/(CLOCK_CONF_SECOND));
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     //memset(fake_ecg_buffer.write_in->store,0,ECG_FRAME_CAPACITY);
     //memset(resp_frame_buffer.write_in->store,0,RESP_FRAME_CAPACITY);
+#ifdef REAL_SENSORS
+    adc_service();
+    ecg_val = adc_reading[2];
     fake_ecg_buffer.write_in->store[j]=uip_htons(ecg_val);
+    //printf("%d\n",ecg_val);
+#else
+    ecg_val = dummy_ecg_next();
+    fake_ecg_buffer.write_in->store[j]=uip_htons(ecg_val);
+#endif
     j++;
     if (j == ECG_FRAME_CAPACITY) {
       j = 0;
@@ -214,10 +228,44 @@ PROCESS_THREAD(fake_signal_process, ev, data)
 
 static void current_vitals_update(void *ptr)
 {
-  current_vitals.r_seqid++;
-  current_vitals.heart_rate++;
+  uint8_t status = 0;
+#ifdef REAL_SENSORS
+  adc_service();
+  resistance = TEMPERATURE_RESISTOR / (((double)(adc_vbatt)/(double)adc_voltage(4)) - 1.0);
+  resistance /= 1000;  //Next line function requires resistance to be in KOhms
+  temperatureD = (5.7513*pow(resistance, 2) - 34.018*(resistance) + 72.661);
+  current_vitals.temperature = (uint8_t)(temperatureD * 1.8) + 32;
+  status=0;
+  if(uart2_can_get())
+  {
+    status = uart2_getc();
+    if((status & 0x80))
+    {
+      if(uart2_can_get())
+      {
+        current_vitals.heart_rate = uart2_getc();
+        current_vitals.heart_rate = (((status & 0x03) << 7) | current_vitals.heart_rate);
+        if(current_vitals.heart_rate == 0x01FF)
+        {
+            printf("No heart rate reported\n");
+        }
+      }
+      if(uart2_can_get())
+      {
+        current_vitals.spo2 = uart2_getc();
+        if(current_vitals.spo2 == 0x7F)
+        {
+            printf("No Spo2\n");
+        }
+      }
+    }    
+  }
+#else
   current_vitals.temperature++;
+  current_vitals.heart_rate++;
   current_vitals.spo2++;
+#endif
+  current_vitals.r_seqid++;
   execute_subscription_callbacks(&record_sl,&current_vitals,NULL);
   uip_ipaddr_copy(&(current_vitals.device_ipv6),&uip_ds6_get_global(ADDR_PREFERRED)->ipaddr);
   process_post(&test_subscription_process, vital_update_event, 0);
@@ -231,6 +279,18 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   static int report_mode = 0;// 0 - broadcast, 1 -vitalprop, 2 - unicast to subscribers
   uip_ipaddr_t sink_addr;
   PROCESS_BEGIN();
+#ifdef REAL_SENSORS
+  // start adc
+  adc_init();
+  adc_setup_chan(0);
+  adc_setup_chan(2);
+  // temperature channel
+  adc_setup_chan(4);
+  // initialize uart2
+  uart_init(UART2, 9600);
+#endif
+  
+  
   resp_frame_buffer_init(&fake_resp_buffer);//this needs to come after process begin
   ecg_frame_buffer_init(&fake_ecg_buffer);
   init_subscription_list(&fake_resp_sl);
@@ -266,7 +326,6 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     PROCESS_YIELD();
     if(ev == buffer_flop_event)
     {
-      printf("new ecg frame\n");
       execute_subscription_callbacks(&fake_resp_sl,fake_resp_buffer.read_out,NULL);
       execute_subscription_callbacks(&fake_ecg_sl,fake_ecg_buffer.read_out,NULL);
     }
