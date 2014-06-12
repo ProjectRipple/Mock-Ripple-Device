@@ -232,6 +232,7 @@ static void current_vitals_update(void *ptr)
   uint8_t status = 0;
   double resistance = 0;
   double temperatureD = 0;
+  uint16_t temp_hr;
 #ifdef REAL_SENSORS
   adc_service();
   resistance = TEMPERATURE_RESISTOR / (((double)(adc_vbatt)/(double)adc_voltage(4)) - 1.0);
@@ -239,30 +240,39 @@ static void current_vitals_update(void *ptr)
   temperatureD = (5.7513*pow(resistance, 2) - 34.018*(resistance) + 72.661);
   current_vitals.temperature = (uint8_t)(temperatureD * 1.8) + 32;
   status=0;
-  if(uart2_can_get())
+  while(uart2_can_get())
   {
     status = uart2_getc();
     if((status & 0x80))
     {
       if(uart2_can_get())
       {
-        current_vitals.heart_rate = uart2_getc();
-        current_vitals.heart_rate = (((status & 0x03) << 7) | current_vitals.heart_rate);
-        if(current_vitals.heart_rate == 0x01FF)
+        temp_hr = uart2_getc();
+        temp_hr = (((status & 0x03) << 7) | temp_hr);
+        if(temp_hr == 0x01FF)
         {
-            printf("No heart rate reported\n");
+            //printf("No heart rate reported\n");
         }
+        if (temp_hr > 255) {
+          temp_hr = 255;
+        }
+        current_vitals.heart_rate = temp_hr;
       }
       if(uart2_can_get())
       {
         current_vitals.spo2 = uart2_getc();
         if(current_vitals.spo2 == 0x7F)
         {
-            printf("No Spo2\n");
+            //printf("No Spo2\n");
         }
       }
-    }    
+    //printf("%x %x %x\n", status, current_vitals.heart_rate, current_vitals.spo2);
+    }  
+    else {
+    //printf("not status byte\n");
+    }  
   }
+  printf("%x %d %d %d\n", status, current_vitals.heart_rate, current_vitals.spo2, current_vitals.temperature);
 #else
   current_vitals.temperature++;
   current_vitals.heart_rate++;
@@ -321,7 +331,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   process_start(&fake_signal_process, 0);
 
   SENSORS_ACTIVATE(button_sensor);
-  ctimer_set(&vtimer, CLOCK_SECOND*3,current_vitals_update,NULL);
+  ctimer_set(&vtimer, CLOCK_SECOND*5,current_vitals_update,NULL);
 
   while(1)
   {
@@ -334,7 +344,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     }
     else if (ev == vital_update_event)
     {
-      ctimer_set(&vtimer, CLOCK_SECOND*3,current_vitals_update,NULL);
+      ctimer_set(&vtimer, CLOCK_SECOND*5,current_vitals_update,NULL);
     }
     else if (ev == sensors_event && data == &button_sensor)
     {
