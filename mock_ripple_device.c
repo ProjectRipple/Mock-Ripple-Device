@@ -83,7 +83,7 @@ static void resp_send(void *frame_ptr, void *data_ptr, subscription_data_t *subs
   rm.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
   rm.r_header.r_msg_type = RESP_STREAM;
   memcpy(rm.store,rf->store,RESP_STREAM_SIZE*2);
-  rm.seq = uip_htons(rf->seq);
+  rm.seq = uip_htonl(rf->seq);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_resp), (uip_ipaddr_t *)subscription_data);
 
 }
@@ -94,8 +94,9 @@ static void ecg_send(void *frame_ptr, void *data_ptr, subscription_data_t *subsc
   struct ecg_frame *rf = (struct ecg_frame *)frame_ptr;
   rm.r_header.r_dispatch=RIPPLECOMM_DISPATCH;
   rm.r_header.r_msg_type = ECG_STREAM;
+  rm.blank = 0x1111; // set buffer bytes so they are easily identified
   memcpy(rm.store,rf->store,ECG_STREAM_SIZE*2);
-  rm.seq = uip_htons(rf->seq);
+  rm.seq = uip_htonl(rf->seq);
   simple_udp_sendto(&vitalcast_connection, &rm, sizeof(struct ripplecomm_ecg), (uip_ipaddr_t *)subscription_data);
 }
 
@@ -277,6 +278,7 @@ static void current_vitals_update(void *ptr)
   current_vitals.temperature++;
   current_vitals.heart_rate++;
   current_vitals.spo2++;
+  current_vitals.bpm++;
 #endif
   current_vitals.r_seqid++;
   execute_subscription_callbacks(&record_sl,&current_vitals,NULL);
@@ -292,6 +294,8 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   static int report_mode = 0;// 0 - broadcast, 1 -vitalprop, 2 - unicast to subscribers
   uip_ipaddr_t sink_addr;
   PROCESS_BEGIN();
+
+
 #ifdef REAL_SENSORS
   // start adc
   adc_init();
@@ -356,8 +360,8 @@ PROCESS_THREAD(test_subscription_process, ev, data)
       {
         //send to aaaa::1
         subscription_data_t sink = {{0}};
-        uip_ip6addr(&sink_addr, 0xabcd, 0, 0, 0, 0xba27, 0xebff, 0xfe79, 0xaf4b);
-	//uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+        //uip_ip6addr(&sink_addr, 0xabcd, 0, 0, 0, 0xba27, 0xebff, 0xfe79, 0xaf4b);
+	uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
         memcpy(&(sink), &sink_addr,sizeof(uip_ipaddr_t));
         create_subscription(&record_sl,0,0,vc_send,sink);
       }

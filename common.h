@@ -102,6 +102,7 @@ struct ripplecomm_s_req
 struct ripplecomm_ecg
 {
   struct ripplecomm_header r_header;
+  uint16_t blank;
   uint32_t seq;
   uint16_t store[ECG_STREAM_SIZE];
 };
