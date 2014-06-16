@@ -342,7 +342,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
   while(1)
   {
 
-    PROCESS_YIELD();
+    
     if(ev == buffer_flop_event)
     {
       execute_subscription_callbacks(&fake_resp_sl,fake_resp_buffer.read_out,NULL);
@@ -352,7 +352,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
     {
       ctimer_set(&vtimer, CLOCK_SECOND*5,current_vitals_update,NULL);
     }
-    else if (ev == sensors_event && data == &button_sensor)
+    else if (report_mode == 0)//(ev == sensors_event && data == &button_sensor)
     {
       report_mode++;
       printf("Report Mode %d\n", report_mode);
@@ -363,7 +363,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
         //send to aaaa::1
         subscription_data_t sink = {{0}};
         uip_ip6addr(&sink_addr, 0xabcd, 0, 0, 0, 0xba27, 0xebff, 0xfe79, 0xaf4b);
-	//uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+	    //uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
         memcpy(&(sink), &sink_addr,sizeof(uip_ipaddr_t));
         create_subscription(&record_sl,0,0,vc_send,sink);
       }
@@ -374,6 +374,7 @@ PROCESS_THREAD(test_subscription_process, ev, data)
       }
 
     }
+    PROCESS_YIELD();
   }
   PROCESS_END();
 }
