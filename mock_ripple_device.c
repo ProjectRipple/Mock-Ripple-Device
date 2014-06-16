@@ -38,6 +38,8 @@
 #ifdef REAL_SENSORS
 #include "uart.h"
 #include "math.h"
+#else
+#include "lib/random.h"
 #endif
 
 
@@ -275,10 +277,10 @@ static void current_vitals_update(void *ptr)
   }
   printf("%x %d %d %d\n", status, current_vitals.heart_rate, current_vitals.spo2, current_vitals.temperature);
 #else
-  current_vitals.temperature++;
-  current_vitals.heart_rate++;
-  current_vitals.spo2++;
-  current_vitals.bpm++;
+  current_vitals.temperature = random_rand()%11 + 90;
+  current_vitals.heart_rate = random_rand()%41 + 60;
+  current_vitals.spo2 = random_rand()%11 + 90;
+  current_vitals.bpm = random_rand()%21 + 30;
 #endif
   current_vitals.r_seqid++;
   execute_subscription_callbacks(&record_sl,&current_vitals,NULL);
