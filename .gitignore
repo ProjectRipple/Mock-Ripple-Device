@@ -4,3 +4,6 @@
 obj_*/
 *.map
 *.bin
+*.sky
+symbols.*
+

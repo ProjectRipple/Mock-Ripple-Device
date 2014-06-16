@@ -88,10 +88,11 @@
 #define NETSTACK_CONF_MAC nullmac_driver
 #define NETSTACK_CONF_RDC nullrdc_driver
 
-
-#ifdef CLOCK_CONF_SECOND
-#undef CLOCK_CONF_SECOND
-#define CLOCK_CONF_SECOND 200
+#ifdef REAL_SENSORS
+    #ifdef CLOCK_CONF_SECOND
+        #undef CLOCK_CONF_SECOND
+        #define CLOCK_CONF_SECOND 200
+    #endif
 #endif
 
 //#define NODE_TYPE_COLLECTOR 1

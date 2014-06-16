@@ -155,9 +155,9 @@ static void set_global_address(void)
   int i;
   uint8_t state;
 
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+  //uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+  //uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+  //uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 
   printf("IPv6 addresses: ");
   for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
@@ -360,8 +360,8 @@ PROCESS_THREAD(test_subscription_process, ev, data)
       {
         //send to aaaa::1
         subscription_data_t sink = {{0}};
-        //uip_ip6addr(&sink_addr, 0xabcd, 0, 0, 0, 0xba27, 0xebff, 0xfe79, 0xaf4b);
-	uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+        uip_ip6addr(&sink_addr, 0xabcd, 0, 0, 0, 0xba27, 0xebff, 0xfe79, 0xaf4b);
+	//uip_ip6addr(&sink_addr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
         memcpy(&(sink), &sink_addr,sizeof(uip_ipaddr_t));
         create_subscription(&record_sl,0,0,vc_send,sink);
       }
